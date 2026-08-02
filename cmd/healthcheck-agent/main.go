@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/saitama-op/healthcheck-agent/internal/checker"
-	"github.com/saitama-op/healthcheck-agent/internal/config"
+	"github.com/healthcheck-agent/internal/checker"
+	"github.com/healthcheck-agent/internal/config"
 )
 
 func main() {
 	configPath := flag.String("config", "configs/healthcheck.yaml", "Path to configuration file")
 	bindInterface := flag.String("interface", "", "Override network interface to bind to (e.g., eth0)")
+	dnsResolver := flag.String("dns", "", "Override DNS resolver to use (e.g., 8.8.8.8)")
 	verbose := flag.Bool("verbose", false, "Enable verbose output")
 	flag.Parse()
 
@@ -24,9 +25,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	// CLI flag overrides YAML config
+	// CLI flags override YAML config
 	if *bindInterface != "" {
 		cfg.BindInterface = *bindInterface
+	}
+	if *dnsResolver != "" {
+		cfg.DNSResolver = *dnsResolver
 	}
 
 	// Create a master context that strictly enforces the global timeout

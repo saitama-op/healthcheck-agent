@@ -5,21 +5,22 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/saitama-op/healthcheck-agent/internal/config"
 )
 
 type Result struct {
-	URL      string
-	Expected int
-	Actual   int
-	Passed   bool
-	Error    error
+	URL        string
+	Expected   int
+	Actual     int
+	Passed     bool
+	Error      error
 }
 
-// getLocalAddr finds the first valid IP for a given interface name
-func getLocalAddr(ifaceName string) (net.Addr, error) {
+// getLocalIP finds the first valid IPv4 address for a given interface name
+func getLocalIP(ifaceName string) (net.IP, error) {
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
 		return nil, fmt.Errorf("interface %s not found: %w", ifaceName, err)
@@ -32,8 +33,8 @@ func getLocalAddr(ifaceName string) (net.Addr, error) {
 
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil { // Prefer IPv4 for Phase 1
-				return &net.TCPAddr{IP: ipnet.IP}, nil
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP, nil
 			}
 		}
 	}
@@ -46,21 +47,48 @@ func Run(ctx context.Context, cfg *config.Config, verbose bool) int {
 		Timeout: cfg.Timeout,
 	}
 
-	// Bind to specific interface if configured
+	var localIP net.IP
+	var err error
+
+	// Extract IP if binding to a specific interface
 	if cfg.BindInterface != "" {
-		localAddr, err := getLocalAddr(cfg.BindInterface)
+		localIP, err = getLocalIP(cfg.BindInterface)
 		if err != nil {
 			if verbose {
 				fmt.Printf("Internal Error: %v\n", err)
 			}
 			return 3 // Internal Error
 		}
-		dialer.LocalAddr = localAddr
+		// Bind standard HTTP (TCP) traffic to the interface
+		dialer.LocalAddr = &net.TCPAddr{IP: localIP}
+	}
+
+	// Set up Custom DNS Resolver if configured
+	if cfg.DNSResolver != "" {
+		dnsServer := cfg.DNSResolver
+		// Automatically append default DNS port if not provided
+		if !strings.Contains(dnsServer, ":") {
+			dnsServer = net.JoinHostPort(dnsServer, "53")
+		}
+
+		dialer.Resolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				dnsDialer := net.Dialer{
+					Timeout: cfg.Timeout,
+				}
+				// Force DNS (UDP) traffic out the specific interface too
+				if localIP != nil {
+					dnsDialer.LocalAddr = &net.UDPAddr{IP: localIP}
+				}
+				return dnsDialer.DialContext(ctx, "udp", dnsServer)
+			},
+		}
 	}
 
 	transport := &http.Transport{
 		DialContext:       dialer.DialContext,
-		DisableKeepAlives: true, // One-shot CLI, keep-alives waste resources
+		DisableKeepAlives: true,
 	}
 
 	client := &http.Client{
@@ -87,7 +115,7 @@ func Run(ctx context.Context, cfg *config.Config, verbose bool) int {
 	total := len(cfg.URLs)
 
 	if verbose {
-		fmt.Printf("Checking (Interface: %s):\n", cfg.BindInterface)
+		fmt.Printf("Checking (Interface: %s, DNS: %s):\n", cfg.BindInterface, cfg.DNSResolver)
 	}
 
 	for res := range results {
