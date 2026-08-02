@@ -5,6 +5,7 @@ user_agent: "healthcheck-agent/1.0"
 
 # Optional: Uncomment the line below to hardcode the network interface (e.g., eth0, wlan0)
 # bind_interface: eth0
+dns_resolver: 8.8.8.8
 
 # Endpoints to check
 urls:

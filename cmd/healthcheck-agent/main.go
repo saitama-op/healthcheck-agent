@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/healthcheck-agent/internal/checker"
-	"github.com/healthcheck-agent/internal/config"
+	"github.com/saitama-op/healthcheck-agent/internal/checker"
+	"github.com/saitama-op/healthcheck-agent/internal/config"
 )
 
 func main() {
