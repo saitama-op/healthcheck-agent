@@ -34,12 +34,12 @@ func main() {
 	defer cancel()
 
 	exitCode := checker.Run(ctx, cfg, *verbose)
-	
+
 	if !*verbose {
 		fmt.Printf("Exit %d\n", exitCode)
 	} else {
 		fmt.Printf("Exit Code: %d\n", exitCode)
 	}
-	
+
 	os.Exit(exitCode)
 }

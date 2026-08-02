@@ -11,11 +11,11 @@ import (
 )
 
 type Result struct {
-	URL        string
-	Expected   int
-	Actual     int
-	Passed     bool
-	Error      error
+	URL      string
+	Expected int
+	Actual   int
+	Passed   bool
+	Error    error
 }
 
 // getLocalAddr finds the first valid IP for a given interface name
@@ -122,21 +122,21 @@ func Run(ctx context.Context, cfg *config.Config, verbose bool) int {
 func checkURL(ctx context.Context, client *http.Client, cfg config.URLConfig, userAgent string) Result {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.URL, nil)
 	if err != nil {
-		return Result{URL: cfg.URL, Expected: cfg.Expected, Passed: false, Error: err}
+		return Result{URL: cfg.URL, Expected: cfg.ExpectedStatus, Passed: false, Error: err}
 	}
 
 	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return Result{URL: cfg.URL, Expected: cfg.Expected, Passed: false, Error: err}
+		return Result{URL: cfg.URL, Expected: cfg.ExpectedStatus, Passed: false, Error: err}
 	}
 	defer resp.Body.Close()
 
-	passed := resp.StatusCode == cfg.Expected
+	passed := resp.StatusCode == cfg.ExpectedStatus
 	return Result{
 		URL:      cfg.URL,
-		Expected: cfg.Expected,
+		Expected: cfg.ExpectedStatus,
 		Actual:   resp.StatusCode,
 		Passed:   passed,
 	}

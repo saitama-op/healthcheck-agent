@@ -1,0 +1,21 @@
+# Global settings
+timeout: 3s
+minimum_success_percent: 50.0
+user_agent: "healthcheck-agent/1.0"
+
+# Optional: Uncomment the line below to hardcode the network interface (e.g., eth0, wlan0)
+# bind_interface: eth0
+
+# Endpoints to check
+urls:
+  - url: https://www.gstatic.com/generate_204
+    expected_status: 204
+
+  - url: https://clients3.google.com/generate_204
+    expected_status: 204
+
+  - url: https://connectivitycheck.gstatic.com/generate_204
+    expected_status: 204
+
+  - url: https://www.google.com
+    expected_status: 200
