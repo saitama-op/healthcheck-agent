@@ -17,7 +17,7 @@ type Config struct {
 	Timeout               time.Duration `yaml:"timeout"`
 	MinimumSuccessPercent float64       `yaml:"minimum_success_percent"`
 	UserAgent             string        `yaml:"user_agent"`
-	BindInterface         string        `yaml:"bind_interface"` 
+	BindInterface         string        `yaml:"bind_interface"`
 	DNSResolver           string        `yaml:"dns_resolver"` // NEW: e.g., "8.8.8.8" or "1.1.1.1:53"
 	URLs                  []URLConfig   `yaml:"urls"`
 }

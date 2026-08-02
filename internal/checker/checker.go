@@ -12,11 +12,11 @@ import (
 )
 
 type Result struct {
-	URL        string
-	Expected   int
-	Actual     int
-	Passed     bool
-	Error      error
+	URL      string
+	Expected int
+	Actual   int
+	Passed   bool
+	Error    error
 }
 
 // getLocalIP finds the first valid IPv4 address for a given interface name
