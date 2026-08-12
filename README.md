@@ -1,6 +1,6 @@
 # healthcheck-agent
 
-A lightweight, dependency-free Go binary designed to validate true internet connectivity across multi-WAN and complex routing environments such as VyOS, pfSense, and standard Linux.
+A lightweight, dependency-free Go binary designed to validate true Internet connectivity across multi-WAN and complex routing environments such as VyOS, pfSense, and standard Linux.
 
 Traditional WAN health checks often rely on pinging a single endpoint such as `8.8.8.8`. This can cause false-positive WAN failovers when a single datacenter is unavailable, ICMP is deprioritized, or a specific destination temporarily has connectivity problems.
 
@@ -11,7 +11,7 @@ Traditional WAN health checks often rely on pinging a single endpoint such as `8
 ## Features
 
 - **Lightweight & Fast:** Single statically linked Go binary.
-- **Multi-WAN Native:** Force HTTP/HTTPS and DNS traffic through a specific physical interface using Linux `SO_BINDTODEVICE`.
+- **Multi-WAN Native on Linux:** Force HTTP/HTTPS and DNS traffic through a specific physical interface using Linux `SO_BINDTODEVICE`.
 - **Multiple Independent Endpoints:** Test connectivity against Cloudflare, Apple, Microsoft, Mozilla, Google, and other providers.
 - **Resiliency Threshold:** Configure `minimum_success_percent` to prevent unnecessary failovers when one or more test endpoints are temporarily unavailable.
 - **Custom DNS Resolution:** Specify a DNS resolver per WAN interface to validate both DNS and Internet connectivity.
@@ -28,7 +28,7 @@ Traditional WAN health checks often rely on pinging a single endpoint such as `8
 For each configured endpoint, the agent:
 
 1. Resolves the hostname using the configured DNS resolver.
-2. Binds network traffic to the specified physical interface when configured.
+2. Binds network traffic to the specified physical interface when supported and configured.
 3. Connects to the endpoint using HTTP or HTTPS.
 4. Validates the returned HTTP status code.
 5. Retries failed checks according to the configured retry policy.
@@ -66,6 +66,92 @@ and 11 configured endpoints:
 ```
 
 This prevents a single endpoint or provider outage from unnecessarily triggering WAN failover.
+
+---
+
+## Platform Support and Limitations
+
+The core health-check functionality works on Linux, Windows, and macOS.
+
+However, **interface-specific traffic binding is currently supported only on Linux**.
+
+### Linux
+
+Linux supports interface binding using `SO_BINDTODEVICE`.
+
+Example:
+
+```yaml
+bind_interface: eth3
+dns_resolver: 192.168.1.1
+```
+
+When `bind_interface` is configured on Linux, the health checks are forced through the specified physical network interface.
+
+This is the recommended configuration for multi-WAN Linux and VyOS deployments.
+
+### Windows
+
+The Windows binary supports the core health-check functionality, including:
+
+- HTTP/HTTPS connectivity checks
+- DNS resolution
+- Multiple endpoint testing
+- Success percentage calculation
+- Retry handling
+- Exit codes
+- Verbose diagnostics
+
+However, **interface-specific binding is not currently supported on Windows**.
+
+The current non-Linux implementation does not bind the socket to the requested interface. The operating system's normal routing table is used.
+
+Therefore, this:
+
+```yaml
+bind_interface: "Ethernet 2"
+```
+
+does **not** currently force traffic through `Ethernet 2`.
+
+Windows is suitable for single-WAN connectivity monitoring, but the current implementation should not be used for Windows multi-WAN interface-specific health checks.
+
+### macOS
+
+The macOS binary supports the core health-check functionality, including:
+
+- HTTP/HTTPS connectivity checks
+- DNS resolution
+- Multiple endpoint testing
+- Success percentage calculation
+- Retry handling
+- Exit codes
+- Verbose diagnostics
+
+However, **interface-specific binding is not currently supported on macOS**.
+
+The current non-Linux implementation does not bind the socket to the requested interface. The operating system's normal routing table is used.
+
+Therefore, `bind_interface` should not be relied upon for macOS multi-WAN interface-specific health checks.
+
+### Platform Support Summary
+
+| Feature | Linux | Windows | macOS |
+|---|:---:|:---:|:---:|
+| HTTP/HTTPS health checks | ✅ | ✅ | ✅ |
+| Multiple endpoints | ✅ | ✅ | ✅ |
+| DNS resolver | ✅ | ✅ | ✅ |
+| Retry logic | ✅ | ✅ | ✅ |
+| Success percentage | ✅ | ✅ | ✅ |
+| Exit codes | ✅ | ✅ | ✅ |
+| Verbose mode | ✅ | ✅ | ✅ |
+| Interface-specific binding | ✅ | ❌ | ❌ |
+| Multi-WAN interface health checks | ✅ | ⚠️ | ⚠️ |
+| VyOS integration | ✅ | ❌ | ❌ |
+
+> **Important:** On Windows and macOS, do not assume that configuring `bind_interface` will force traffic through a particular network interface. The current implementation relies on the operating system's normal routing behavior on these platforms.
+
+Platform-specific interface binding for Windows and macOS may be added in a future release.
 
 ---
 
@@ -153,7 +239,7 @@ Example `healthcheck.yaml`:
 # Global settings
 
 # Maximum time allowed for an individual HTTP/HTTPS request.
-timeout: 250ms
+timeout: 1s
 
 # Minimum percentage of endpoints that must succeed
 # for the WAN to be considered healthy.
@@ -162,8 +248,9 @@ minimum_success_percent: 60.0
 # User-Agent sent with HTTP/HTTPS requests.
 user_agent: "Dalvik/2.1.0 (Linux; U; Android 14; Pixel 8 Pro)"
 
-# Optional interface binding.
-# Forces connectivity tests through a specific WAN interface.
+# Optional Linux interface binding.
+# On Linux/VyOS, this forces connectivity tests through a specific WAN interface.
+# On Windows and macOS, interface binding is currently not supported.
 bind_interface: eth0
 
 # Optional DNS resolver.
@@ -212,6 +299,40 @@ urls:
     expected_status: 200
 ```
 
+### Windows/macOS Configuration
+
+For Windows and macOS, omit `bind_interface` unless and until platform-specific interface binding is implemented.
+
+For example:
+
+```yaml
+timeout: 1s
+minimum_success_percent: 60.0
+
+dns_resolver: 192.168.1.1
+
+retry: 3
+retry_delay: 250ms
+
+urls:
+  - url: http://cp.cloudflare.com/generate_204
+    expected_status: 204
+
+  - url: http://detectportal.firefox.com/success.txt
+    expected_status: 200
+
+  - url: http://www.msftconnecttest.com/connecttest.txt
+    expected_status: 200
+
+  - url: https://www.gstatic.com/generate_204
+    expected_status: 204
+
+  - url: https://www.google.com/generate_204
+    expected_status: 204
+```
+
+The operating system's normal routing table will be used.
+
 ---
 
 ## Configuration Options
@@ -221,7 +342,7 @@ urls:
 | `timeout` | Maximum duration allowed for an individual HTTP/HTTPS request. |
 | `minimum_success_percent` | Minimum percentage of endpoints that must succeed for the overall test to be healthy. |
 | `user_agent` | HTTP User-Agent header sent to endpoints. |
-| `bind_interface` | Optional Linux interface to which network traffic is bound. |
+| `bind_interface` | Optional Linux interface to which network traffic is bound. Currently supported only on Linux. |
 | `dns_resolver` | Optional DNS resolver used for hostname resolution. |
 | `retry` | Number of retries performed for failed endpoint checks. |
 | `retry_delay` | Delay between retry attempts. |
@@ -233,7 +354,7 @@ urls:
 
 ## Multi-WAN Interface Binding
 
-The `bind_interface` option allows the health check to be executed through a specific WAN interface.
+The `bind_interface` option allows the health check to be executed through a specific WAN interface on Linux.
 
 For example:
 
@@ -309,20 +430,18 @@ Use verbose mode when troubleshooting:
 Example output:
 
 ```text
-Checking (Interface: eth0, DNS: 192.168.0.1):
-✓ http://www.msftconnecttest.com/connecttest.txt (200)
-✓ http://cp.cloudflare.com/generate_204 (204)
-✓ http://detectportal.firefox.com/success.txt (200)
-✓ http://captive.apple.com/hotspot-detect.html (200)
-✓ https://www.google.com/generate_204 (204)
-✓ https://www.apple.com (200)
-✓ https://www.gstatic.com/generate_204 (204)
-✓ https://connectivitycheck.gstatic.com/generate_204 (204)
-✓ https://clients3.google.com/generate_204 (204)
-✓ https://1.1.1.1 (200)
-✓ https://www.microsoft.com (200)
+Checking (Interface: eth2, DNS: 192.168.5.1):
 
-Success: 11/11 (100%)
+✓ http://cp.cloudflare.com/generate_204 (204)
+✓ http://captive.apple.com/hotspot-detect.html (200)
+✓ http://www.msftconnecttest.com/connecttest.txt (200)
+✓ http://detectportal.firefox.com/success.txt (200)
+✓ https://www.gstatic.com/generate_204 (204)
+✓ https://clients3.google.com/generate_204 (204)
+✓ https://connectivitycheck.gstatic.com/generate_204 (204)
+✓ https://www.google.com/generate_204 (204)
+
+Success: 8/8 (100%)
 Exit Code: 0
 ```
 
@@ -341,25 +460,13 @@ sudo ./healthcheck-agent \
 
 This is useful for testing individual WAN connections without changing the configuration file.
 
+> **Platform note:** `-interface` is currently effective only on Linux. On Windows and macOS, interface-specific binding is not implemented.
+
 ---
-
-## Platform Limitations
-
-`healthcheck-agent` supports Linux, Windows, and macOS for general Internet connectivity testing. However, interface-specific traffic binding is currently platform-dependent.
-
-### Linux
-
-Linux supports interface binding using `SO_BINDTODEVICE`.
-
-Example:
-
-```yaml
-bind_interface: eth3
-dns_resolver: 192.168.1.1
 
 ## Linux Interface Binding
 
-When `bind_interface` or the `-interface` option is used, the application uses Linux `SO_BINDTODEVICE` to bind network traffic to the specified interface.
+When `bind_interface` or the `-interface` option is used on Linux, the application uses `SO_BINDTODEVICE` to bind network traffic to the specified interface.
 
 For example:
 
@@ -561,7 +668,7 @@ This reduces bandwidth consumption and keeps health-check execution fast.
 A practical multi-WAN configuration could use:
 
 ```yaml
-timeout: 250ms
+timeout: 1s
 minimum_success_percent: 60.0
 retry: 3
 retry_delay: 250ms
@@ -581,15 +688,15 @@ At least 7 successful endpoint checks are required to consider the WAN healthy.
 Examples:
 
 ```text
-11/11 → Healthy
-10/11 → Healthy
- 9/11 → Healthy
- 8/11 → Healthy
- 7/11 → Healthy
- 6/11 → Unhealthy
+11/11 -> Healthy
+10/11 -> Healthy
+ 9/11 -> Healthy
+ 8/11 -> Healthy
+ 7/11 -> Healthy
+ 6/11 -> Unhealthy
 ```
 
-This prevents one or two individual endpoint failures from unnecessarily causing WAN failover.
+This prevents one or more individual endpoint failures from unnecessarily causing WAN failover.
 
 ---
 
@@ -715,7 +822,7 @@ The agent does not require inbound network access.
 
 It performs outbound connectivity checks only.
 
-When using interface binding:
+When using interface binding on Linux:
 
 ```text
 SO_BINDTODEVICE
@@ -731,7 +838,7 @@ Only grant the minimum privileges required for the deployment environment.
 
 This project is licensed under the MIT License.
 
-Copyright (c) 2026 sanjay kamalakshan
+Copyright (c) 2026 Sanjay Kamalakshan
 
 See the full license text in [LICENSE](LICENSE).
 
