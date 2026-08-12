@@ -343,6 +343,20 @@ This is useful for testing individual WAN connections without changing the confi
 
 ---
 
+## Platform Limitations
+
+`healthcheck-agent` supports Linux, Windows, and macOS for general Internet connectivity testing. However, interface-specific traffic binding is currently platform-dependent.
+
+### Linux
+
+Linux supports interface binding using `SO_BINDTODEVICE`.
+
+Example:
+
+```yaml
+bind_interface: eth3
+dns_resolver: 192.168.1.1
+
 ## Linux Interface Binding
 
 When `bind_interface` or the `-interface` option is used, the application uses Linux `SO_BINDTODEVICE` to bind network traffic to the specified interface.
