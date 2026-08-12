@@ -309,18 +309,20 @@ Use verbose mode when troubleshooting:
 Example output:
 
 ```text
-Checking (Interface: eth2, DNS: 192.168.5.1):
-
-✓ http://cp.cloudflare.com/generate_204 (204)
-✓ http://captive.apple.com/hotspot-detect.html (200)
+Checking (Interface: eth0, DNS: 192.168.0.1):
 ✓ http://www.msftconnecttest.com/connecttest.txt (200)
+✓ http://cp.cloudflare.com/generate_204 (204)
 ✓ http://detectportal.firefox.com/success.txt (200)
-✓ https://www.gstatic.com/generate_204 (204)
-✓ https://clients3.google.com/generate_204 (204)
-✓ https://connectivitycheck.gstatic.com/generate_204 (204)
+✓ http://captive.apple.com/hotspot-detect.html (200)
 ✓ https://www.google.com/generate_204 (204)
+✓ https://www.apple.com (200)
+✓ https://www.gstatic.com/generate_204 (204)
+✓ https://connectivitycheck.gstatic.com/generate_204 (204)
+✓ https://clients3.google.com/generate_204 (204)
+✓ https://1.1.1.1 (200)
+✓ https://www.microsoft.com (200)
 
-Success: 8/8 (100%)
+Success: 11/11 (100%)
 Exit Code: 0
 ```
 
