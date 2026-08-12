@@ -3,12 +3,12 @@ package checker
 import (
 	"context"
 	"fmt"
+	"github.com/saitama-op/healthcheck-agent/internal/config"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
-
-	"github.com/saitama-op/healthcheck-agent/internal/config"
+	"time"
 )
 
 type Result struct {
@@ -61,6 +61,7 @@ func Run(ctx context.Context, cfg *config.Config, verbose bool) int {
 		}
 		// Bind standard HTTP (TCP) traffic to the interface
 		dialer.LocalAddr = &net.TCPAddr{IP: localIP}
+		bindToInterface(dialer, cfg.BindInterface)
 	}
 
 	// Set up Custom DNS Resolver if configured
@@ -104,7 +105,7 @@ func Run(ctx context.Context, cfg *config.Config, verbose bool) int {
 		wg.Add(1)
 		go func(urlConfig config.URLConfig) {
 			defer wg.Done()
-			results <- checkURL(ctx, client, urlConfig, cfg.UserAgent)
+			results <- checkURL(ctx, client, urlConfig, cfg.UserAgent, cfg.Retry, cfg.RetryDelay)
 		}(u)
 	}
 
@@ -147,25 +148,57 @@ func Run(ctx context.Context, cfg *config.Config, verbose bool) int {
 	return 1 // Unhealthy
 }
 
-func checkURL(ctx context.Context, client *http.Client, cfg config.URLConfig, userAgent string) Result {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.URL, nil)
-	if err != nil {
-		return Result{URL: cfg.URL, Expected: cfg.ExpectedStatus, Passed: false, Error: err}
+// checkURL performs the HTTP request with built-in retry logic
+func checkURL(ctx context.Context, client *http.Client, cfg config.URLConfig, userAgent string, retries int, retryDelay time.Duration) Result {
+	var lastResult Result
+
+	// Loop for 1 initial attempt + 'retries'
+	for attempt := 0; attempt <= retries; attempt++ {
+		// If context has already expired, bail out early
+		if ctx.Err() != nil {
+			lastResult.Error = ctx.Err()
+			return lastResult
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.URL, nil)
+		if err != nil {
+			lastResult = Result{URL: cfg.URL, Expected: cfg.ExpectedStatus, Passed: false, Error: err}
+			// If we fail to even build the request, retrying won't help
+			return lastResult
+		}
+
+		req.Header.Set("User-Agent", userAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastResult = Result{URL: cfg.URL, Expected: cfg.ExpectedStatus, Passed: false, Error: err}
+		} else {
+			passed := resp.StatusCode == cfg.ExpectedStatus
+			lastResult = Result{
+				URL:      cfg.URL,
+				Expected: cfg.ExpectedStatus,
+				Actual:   resp.StatusCode,
+				Passed:   passed,
+			}
+			resp.Body.Close()
+
+			// If it passed, break out of the retry loop immediately
+			if passed {
+				return lastResult
+			}
+		}
+
+		// If we failed and have retries left, wait before trying again
+		if attempt < retries {
+			select {
+			case <-ctx.Done(): // Global timeout hit while waiting
+				lastResult.Error = ctx.Err()
+				return lastResult
+			case <-time.After(retryDelay):
+				// Wait completed, proceed to next loop iteration
+			}
+		}
 	}
 
-	req.Header.Set("User-Agent", userAgent)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return Result{URL: cfg.URL, Expected: cfg.ExpectedStatus, Passed: false, Error: err}
-	}
-	defer resp.Body.Close()
-
-	passed := resp.StatusCode == cfg.ExpectedStatus
-	return Result{
-		URL:      cfg.URL,
-		Expected: cfg.ExpectedStatus,
-		Actual:   resp.StatusCode,
-		Passed:   passed,
-	}
+	return lastResult
 }

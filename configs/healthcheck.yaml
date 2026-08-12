@@ -1,11 +1,13 @@
 # Global settings
-timeout: 3s
+timeout: 250ms
 minimum_success_percent: 50.0
 user_agent: "healthcheck-agent/1.0"
 
 # Optional: Uncomment the line below to hardcode the network interface (e.g., eth0, wlan0)
 # bind_interface: eth0
 dns_resolver: 8.8.8.8
+retry: 3
+retry_delay: 500ms
 
 # Endpoints to check
 urls:
@@ -19,4 +21,20 @@ urls:
     expected_status: 204
 
   - url: https://www.google.com
+    expected_status: 200
+
+  # Cloudflare's Captive Portal Check
+  - url: http://cp.cloudflare.com/generate_204
+    expected_status: 204
+
+  # Apple's standard macOS/iOS connectivity check
+  - url: http://captive.apple.com/hotspot-detect.html
+    expected_status: 200
+
+  # Microsoft's Windows 10/11 connectivity check
+  - url: http://www.msftconnecttest.com/connecttest.txt
+    expected_status: 200
+
+  # Mozilla Firefox's background connectivity check
+  - url: http://detectportal.firefox.com/success.txt
     expected_status: 200

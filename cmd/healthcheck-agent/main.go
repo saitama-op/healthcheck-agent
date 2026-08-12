@@ -4,10 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
-
 	"github.com/saitama-op/healthcheck-agent/internal/checker"
 	"github.com/saitama-op/healthcheck-agent/internal/config"
+	"os"
+	"time"
 )
 
 // resolveConfigPath checks multiple standard locations for the config file
@@ -63,7 +63,11 @@ func main() {
 	}
 
 	// Create a master context that strictly enforces the global timeout
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
+	totalAttempts := time.Duration(cfg.Retry + 1)
+	maxRunTime := (totalAttempts * cfg.Timeout) + (time.Duration(cfg.Retry) * cfg.RetryDelay) + (2 * time.Second)
+
+	// Create a master context using the total maxRunTime
+	ctx, cancel := context.WithTimeout(context.Background(), maxRunTime)
 	defer cancel()
 
 	exitCode := checker.Run(ctx, cfg, *verbose)
