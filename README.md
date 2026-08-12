@@ -147,7 +147,7 @@ Therefore, `bind_interface` should not be relied upon for macOS multi-WAN interf
 | Verbose mode | ✅ | ✅ | ✅ |
 | Interface-specific binding | ✅ | ❌ | ❌ |
 | Multi-WAN interface health checks | ✅ | ⚠️ | ⚠️ |
-| VyOS integration | ✅ | ❌ | ❌ |
+
 
 > **Important:** On Windows and macOS, do not assume that configuring `bind_interface` will force traffic through a particular network interface. The current implementation relies on the operating system's normal routing behavior on these platforms.
 
