@@ -713,15 +713,11 @@ Only grant the minimum privileges required for the deployment environment.
 
 ## License
 
-Add the project's license information here.
+This project is licensed under the MIT License.
 
-For example:
+Copyright (c) 2026 sanjay kamalakshan
 
-```text
-MIT License
-```
-
-if the repository is intended to use the MIT license.
+See the full license text in [LICENSE](LICENSE).
 
 ---
 
